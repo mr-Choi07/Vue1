@@ -1,67 +1,112 @@
 <template>
   <div class="container">
-    <!-- 네비게이션 바 -->
     <nav class="tmdb-navbar">
       <span class="tmdb-logo">TMDB <span class="logo-dot"></span></span>
-      <a href="#">영화</a>
-      <a href="#">TV 프로그램</a>
+      <a href="#" :class="{ active: tab==='movie' }" @click.prevent="changeTab('movie')">영화</a>
+      <a href="#" :class="{ active: tab==='tv' }" @click.prevent="changeTab('tv')">TV 프로그램</a>
       <a href="#">인물</a>
       <a href="#">More</a>
     </nav>
 
-    <!-- 정렬/검색 바 -->
-    <div class="top-bar">
-      <div class="sort-bar">
-        <button @click="sortBy('rating')">평점순</button>
-        <button @click="sortBy('title')">가나다순</button>
-        <button @click="sortBy('date')">최신순</button>
-      </div>
-      <input
-        v-model="searchText"
-        @input="filterMovies"
-        type="text"
-        class="search-input"
-        placeholder="영화 제목 검색"
-        autocomplete="off"
-      />
-    </div>
-
-    <!-- 영화 카드 목록 -->
-    <div class="movies-grid">
-      <div
-        class="movie-card"
-        v-for="movie in movies"
-        :key="movie.id"
-        @click="openDetail(movie)"
-      >
-        <div class="poster-area">
-          <img
-            class="poster"
-            :src="getPosterUrl(movie.poster_path)"
-            :alt="movie.title"
-          />
+    <div class="main-section">
+      <div class="top-bar">
+        <div class="sort-bar">
+          <button @click="sortBy('rating')">평점순</button>
+          <button @click="sortBy('title')">가나다순</button>
+          <button @click="sortBy('date')">최신순</button>
         </div>
-        <div class="card-info">
-          <span class="movie-title" :title="movie.title">{{ movie.title }}</span>
-          <span class="movie-rating">{{ movie.vote_average }}</span>
-        </div>
-      </div>
-    </div>
 
-    <!-- 영화 상세 모달 -->
-    <div v-if="detailMovie" class="movie-detail-modal" @click.self="closeDetail">
-      <div class="detail-content">
-        <button class="close-btn" @click="closeDetail">✕</button>
-        <img
-          class="detail-poster"
-          :src="getPosterUrl(detailMovie.poster_path)"
-          :alt="detailMovie.title"
+        <input
+          v-model="searchText"
+          @input="handleSearch"
+          type="text"
+          class="search-input"
+          :placeholder="tab === 'movie' ? '영화 제목 검색' : 'TV 제목 검색'"
+          autocomplete="off"
         />
-        <div class="detail-info">
-          <h2>{{ detailMovie.title }}</h2>
-          <p class="detail-rating">평점: {{ detailMovie.vote_average }}</p>
-          <p class="detail-date">개봉일: {{ detailMovie.release_date }}</p>
-          <div class="detail-overview">{{ detailMovie.overview }}</div>
+      </div>
+
+      <div class="movies-grid">
+        <div
+          class="movie-card"
+          v-for="item in items"
+          :key="item.id"
+          @click="openDetail(item)"
+        >
+          <div class="poster-wrap">
+            <img
+              class="poster"
+              :src="getPosterUrl(item.poster_path)"
+              :alt="getTitle(item)"
+            />
+          </div>
+          <div class="card-info">
+            <span class="movie-title" :title="getTitle(item)">{{ getTitle(item) }}</span>
+            <span class="movie-rating">{{ item.vote_average }}</span>
+          </div>
+        </div>
+      </div>
+
+      <div v-if="!searchText && totalPages > 1" class="pagination-bar">
+        <button :disabled="page === 1" class="page-btn" @click="changePage(page - 1)">이전</button>
+        <button
+          v-for="num in pageNums"
+          :key="num"
+          class="page-btn"
+          :class="{ active: num === page }"
+          @click="changePage(num)"
+        >
+          {{ num }}
+        </button>
+        <button :disabled="page === totalPages" class="page-btn" @click="changePage(page + 1)">다음</button>
+      </div>
+
+      <div v-if="searchText && searchPageCount > 1" class="pagination-bar">
+        <button :disabled="searchPage === 1" class="page-btn" @click="changeSearchPage(searchPage - 1)">이전</button>
+        <button
+          v-for="num in searchPageNums"
+          :key="num"
+          class="page-btn"
+          :class="{ active: num === searchPage }"
+          @click="changeSearchPage(num)"
+        >
+          {{ num }}
+        </button>
+        <button :disabled="searchPage === searchPageCount" class="page-btn" @click="changeSearchPage(searchPage + 1)">다음</button>
+      </div>
+    </div>
+
+    <div v-if="detailItem" class="movie-modal" @click.self="closeModal">
+      <div class="modal-content">
+        <button class="close-btn" @click="closeModal">✕</button>
+
+        <div class="modal-left">
+          <img class="poster-large" :src="getPosterUrl(detailItem.poster_path)" :alt="getTitle(detailItem)" />
+        </div>
+
+        <div class="modal-right">
+          <div class="movie-info">
+            <h2>{{ getTitle(detailItem) }}</h2>
+            <p class="score">평점: {{ detailItem.vote_average }}</p>
+            <p class="date">
+              {{ tab === 'movie' ? '개봉일: ' + detailItem.release_date : '방영일: ' + detailItem.first_air_date }}
+            </p>
+            <p class="overview">{{ detailItem.overview }}</p>
+          </div>
+
+          <div class="trailer-section">
+            <h3>예고편</h3>
+            <div v-if="trailerKey" class="trailer-video">
+              <iframe
+                :src="`https://www.youtube.com/embed/${trailerKey}`"
+                frameborder="0"
+                allow="accelerometer; autoplay; clipboard-write; encrypted-media; gyroscope; picture-in-picture"
+                allowfullscreen
+                title="트레일러 영상"
+              ></iframe>
+            </div>
+            <div v-else class="no-trailer">예고편이 없습니다.</div>
+          </div>
         </div>
       </div>
     </div>
@@ -70,59 +115,177 @@
 
 <script>
 import axios from "axios";
+
 export default {
   data() {
     return {
-      movies: [],
-      rawMovies: [],
-      detailMovie: null,
+      tab: "movie",
+      items: [],
+      detailItem: null,
       searchText: "",
+      page: 1,
+      totalPages: 1,
+      searchPage: 1,
+      searchPageCount: 1,
+      trailerKey: null,
+      apiKey: "bf70d26cea38b2e84c7c7f4122b5eb9c",
     };
   },
+  computed: {
+    pageNums() {
+      const maxBtn = 5;
+      let start = Math.max(this.page - Math.floor(maxBtn / 2), 1);
+      let end = start + maxBtn - 1;
+      if (end > this.totalPages) {
+        end = this.totalPages;
+        start = Math.max(end - maxBtn + 1, 1);
+      }
+      const nums = [];
+      for (let i = start; i <= end; i++) nums.push(i);
+      return nums;
+    },
+    searchPageNums() {
+      const maxBtn = 5;
+      let start = Math.max(this.searchPage - Math.floor(maxBtn / 2), 1);
+      let end = start + maxBtn - 1;
+      if (end > this.searchPageCount) {
+        end = this.searchPageCount;
+        start = Math.max(end - maxBtn + 1, 1);
+      }
+      const nums = [];
+      for (let i = start; i <= end; i++) nums.push(i);
+      return nums;
+    },
+  },
+  watch: {
+    tab() {
+      this.page = 1;
+      this.searchText = "";
+      this.fetchItems();
+    },
+    page() {
+      if (!this.searchText) this.fetchItems();
+    },
+  },
   mounted() {
-    this.fetchMovies();
+    this.fetchItems();
   },
   methods: {
-    async fetchMovies() {
-      const apiKey = "bf70d26cea38b2e84c7c7f4122b5eb9c"; // 실제 API 키로 교체!
-      const url = `https://api.themoviedb.org/3/movie/popular?api_key=${apiKey}&language=ko-KR&page=1`;
-      const response = await axios.get(url);
-      this.movies = response.data.results;
-      this.rawMovies = [...response.data.results];
+    async fetchItems() {
+      const type = this.tab === "movie" ? "movie" : "tv";
+      const url = `https://api.themoviedb.org/3/${type}/popular?api_key=${this.apiKey}&language=ko-KR&page=${this.page}`;
+      try {
+        const res = await axios.get(url);
+        this.items = res.data.results;
+        this.totalPages = res.data.total_pages;
+        this.detailItem = null;
+        this.trailerKey = null;
+      } catch (error) {
+        console.error(error);
+      }
+    },
+    async runSearch() {
+      if (!this.searchText.trim()) {
+        this.fetchItems();
+        return;
+      }
+      const type = this.tab === "movie" ? "movie" : "tv";
+      const url = `https://api.themoviedb.org/3/search/${type}`;
+      try {
+        const res = await axios.get(url, {
+          params: {
+            api_key: this.apiKey,
+            query: this.searchText,
+            language: "ko-KR",
+            page: this.searchPage,
+          },
+        });
+        this.items = res.data.results;
+        this.searchPageCount = res.data.total_pages;
+        this.detailItem = null;
+        this.trailerKey = null;
+      } catch (error) {
+        console.error(error);
+      }
+    },
+    sortBy(type) {
+      if (this.items.length <= 1) return;
+      const getTitle = (item) => (this.tab === "movie" ? item.title : item.name);
+      switch (type) {
+        case "rating": {
+          const sorted = this.items.sort((a, b) => b.vote_average - a.vote_average);
+          this.items = [...sorted];
+          break;
+        }
+        case "title": {
+          const sorted = this.items.sort((a, b) =>
+            getTitle(a).localeCompare(getTitle(b), "ko", { sensitivity: "base" })
+          );
+          this.items = [...sorted];
+          break;
+        }
+        case "date": {
+          const getDate = (item) => (this.tab === "movie" ? item.release_date : item.first_air_date);
+          const sorted = this.items.sort((a, b) =>
+            (getDate(b) || "").localeCompare(getDate(a) || "")
+          );
+          this.items = [...sorted];
+          break;
+        }
+      }
+    },
+    async handleSearch() {
+      this.searchPage = 1;
+      this.runSearch();
+    },
+    async openDetail(item) {
+      this.detailItem = item;
+      this.trailerKey = null;
+      const type = this.tab === "movie" ? "movie" : "tv";
+      const url = `https://api.themoviedb.org/3/${type}/${item.id}/videos?api_key=${this.apiKey}&language=ko-KR`;
+      try {
+        const res = await axios.get(url);
+        const trailers = res.data.results.filter(
+          (v) => v.site === "YouTube" && (v.type === "Trailer" || v.type === "Teaser")
+        );
+        this.trailerKey = trailers.length ? trailers[0].key : null;
+      } catch (error) {
+        console.error(error);
+        this.trailerKey = null;
+      }
+    },
+    closeModal() {
+      this.detailItem = null;
+      this.trailerKey = null;
+    },
+    changeTab(tab) {
+      if (this.tab !== tab) {
+        this.tab = tab;
+        this.page = 1;
+        this.searchText = "";
+        this.fetchItems();
+        this.detailItem = null;
+        this.trailerKey = null;
+      }
+    },
+    changePage(page) {
+      if (page >= 1 && page <= this.totalPages && page !== this.page) {
+        this.page = page;
+      }
+    },
+    changeSearchPage(page) {
+      if (page >= 1 && page <= this.searchPageCount && page !== this.searchPage) {
+        this.searchPage = page;
+        this.runSearch();
+      }
     },
     getPosterUrl(path) {
       return path
-        ? `https://image.tmdb.org/t/p/w500${path}`
+        ? "https://image.tmdb.org/t/p/w500" + path
         : "https://via.placeholder.com/350x520?text=No+Image";
     },
-    sortBy(type) {
-      if (type === "rating") {
-        this.movies.sort((a, b) => b.vote_average - a.vote_average);
-      } else if (type === "title") {
-        this.movies.sort((a, b) =>
-          a.title.localeCompare(b.title, "ko", { sensitivity: "base" })
-        );
-      } else if (type === "date") {
-        this.movies.sort((a, b) =>
-          (b.release_date || "").localeCompare(a.release_date || "")
-        );
-      }
-    },
-    openDetail(movie) {
-      this.detailMovie = movie;
-    },
-    closeDetail() {
-      this.detailMovie = null;
-    },
-    filterMovies() {
-      if (this.searchText.trim() === "") {
-        this.movies = [...this.rawMovies];
-      } else {
-        const keyword = this.searchText.trim().toLowerCase();
-        this.movies = this.rawMovies.filter((m) =>
-          m.title.toLowerCase().includes(keyword)
-        );
-      }
+    getTitle(item) {
+      return this.tab === "movie" ? item.title : item.name;
     },
   },
 };
@@ -136,110 +299,106 @@ export default {
 .tmdb-navbar {
   display: flex;
   align-items: center;
-  padding: 0 28px;
+  padding: 0 16px;
   height: 64px;
   background: #1b375c;
-  color: #fff;
+  color: white;
   font-weight: 500;
-  gap: 34px;
+  gap: 24px;
+  flex-wrap: wrap;
+  font-size: 1.05rem;
 }
 .tmdb-logo {
-  font-size: 1.3em;
-  font-weight: 700;
-  letter-spacing: 0.5px;
-  margin-right: 19px;
+  font-size: 1.25rem;
+  font-weight: bold;
   display: flex;
   align-items: center;
+  gap: 7px;
 }
 .logo-dot {
-  display: inline-block;
   width: 16px;
   height: 8px;
   background: #39c5a5;
   border-radius: 6px;
-  margin-left: 7px;
 }
 .tmdb-navbar a {
-  color: #fff;
+  color: white;
   text-decoration: none;
-  margin-right: 16px;
-  transition: color 0.2s;
+  font-weight: 600;
+  padding: 6px 14px 5px 14px;
+  border-radius: 7px;
+  transition: background-color 0.2s;
 }
-.tmdb-navbar a:hover {
+.tmdb-navbar a:hover,
+.tmdb-navbar a.active {
+  background: rgba(58, 197, 165, 0.3);
   color: #39c5a5;
 }
-/* 정렬/검색바 */
+
+.main-section {
+  max-width: 1198px;
+  margin: 32px auto 12px;
+  width: 100%;
+}
 .top-bar {
-  max-width: 1200px;
   display: flex;
-  align-items: center;
   justify-content: space-between;
-  margin: 20px auto 2px;
-  gap: 14px;
+  gap: 10px;
+  flex-wrap: wrap;
+  margin-bottom: 28px;
 }
 .sort-bar {
   display: flex;
-  gap: 9px;
+  gap: 12px;
 }
 .sort-bar button {
-  background: #39c5a5;
-  color: #fff;
-  border: none;
-  border-radius: 6px;
-  padding: 8px 15px;
-  font-weight: 500;
   cursor: pointer;
-  transition: background 0.17s;
+  border: none;
+  border-radius: 8px;
+  background-color: #39c5a5;
+  color: white;
+  padding: 8px 20px;
+  font-weight: 600;
+  font-size: 1rem;
+  transition: background-color 0.3s;
 }
 .sort-bar button:hover {
-  background: #1b375c;
+  background-color: #173c66;
 }
 .search-input {
-  background: #fff;
-  border: 1.5px solid #39c5a5;
-  border-radius: 7px;
-  padding: 8px 17px;
+  flex-grow: 1;
   min-width: 180px;
-  font-size: 1em;
-  color: #424874;
-  box-sizing: border-box;
-  transition: border 0.13s;
+  max-width: 320px;
+  font-size: 1rem;
+  padding: 10px 20px;
+  border: 2px solid #3bc1a9;
+  border-radius: 8px;
 }
-.search-input:focus {
-  border-color: #1b375c;
-  outline: none;
-}
+
 .movies-grid {
-  margin: 36px auto 0;
-  max-width: 1200px;
   display: grid;
-  grid-template-columns: repeat(auto-fit, minmax(260px, 1fr));
-  gap: 46px 32px;
+  grid-template-columns: repeat(auto-fill, minmax(245px, 1fr));
+  gap: 36px 22px;
+  justify-items: center;
 }
 .movie-card {
-  background: #fff;
-  border-radius: 16px;
+  cursor: pointer;
+  width: 245px;
+  min-height: 430px;
+  border-radius: 15px;
+  box-shadow: 0 20px 40px rgb(0 0 0 / 6%);
   overflow: hidden;
-  box-shadow: 0 4px 28px rgba(27,55,92,0.10);
   display: flex;
   flex-direction: column;
-  min-height: 460px;
-  max-width: 290px;
-  transition: box-shadow 0.18s, transform 0.18s;
-  cursor: pointer;
+  margin: 0;
+  background: white;
 }
-.movie-card:hover {
-  box-shadow: 0 14px 40px rgba(27,55,92,0.26);
-  transform: translateY(-12px) scale(1.05);
-  z-index: 2;
-}
-.poster-area {
+.poster-wrap {
+  height: 360px;
   width: 100%;
-  height: 390px;
-  background: #ededed;
   display: flex;
-  align-items: center;
   justify-content: center;
+  align-items: center;
 }
 .poster {
   width: 100%;
@@ -247,86 +406,219 @@ export default {
   object-fit: cover;
 }
 .card-info {
-  width: 100%;
-  background: #424874; 
+  background-color: #3b436b;
   height: 70px;
+  padding: 0 24px;
   display: flex;
-  flex-direction: row;
-  align-items: center;
   justify-content: space-between;
-  box-sizing: border-box;
-  padding: 0 22px;
-  overflow: hidden;
+  align-items: center;
+  border-radius: 0 0 15px 15px;
 }
 .movie-title {
-  font-size: 1.12em;
-  font-weight: 500;
-  max-width: 160px;
+  color: white;
+  font-weight: 600;
+  white-space: nowrap;
   overflow: hidden;
   text-overflow: ellipsis;
-  white-space: nowrap;
-  color: #fff;
+  max-width: 65%;
+  font-size: 1rem;
 }
 .movie-rating {
-  font-size: 1em;
-  font-weight: 600;
   background-color: #39c5a5;
-  color: #2d4569;
-  padding: 7px 19px;
-  border-radius: 12px;
-  margin-left: 18px;
-  flex-shrink: 0;
+  padding: 6px 14px;
+  border-radius: 15px;
+  color: #285a80;
+  font-weight: 700;
+  font-size: 1rem;
 }
-/* 상세 모달 */
-.movie-detail-modal {
+
+.pagination-bar {
+  margin-top: 30px;
+  margin-bottom: 48px;
+  display: flex;
+  justify-content: center;
+  gap: 10px;
+  flex-wrap: wrap;
+}
+.page-btn {
+  border: none;
+  background-color: #e3e8ef;
+  color: #3f4e73;
+  padding: 8px 16px;
+  font-weight: 600;
+  border-radius: 7px;
+  cursor: pointer;
+  transition: all 0.3s ease;
+}
+.page-btn:hover {
+  background-color: #3bc1a9;
+  color: white;
+}
+.page-btn:disabled {
+  opacity: 0.5;
+  cursor: default;
+}
+.page-btn.active {
+  background-color: #3bc1a9;
+  color: white;
+}
+
+/* Modal */
+.movie-modal {
   position: fixed;
-  top: 0; left: 0;
-  width: 100vw; height: 100vh;
-  background: rgba(36,45,95,0.36);
-  display: flex; align-items: center; justify-content: center;
-  z-index: 50;
+  top: 0;
+  left: 0;
+  width: 100vw;
+  height: 100vh;
+  background-color: rgba(36, 45, 92, 0.5);
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  z-index: 300;
 }
-.detail-content {
-  background: #fff;
-  border-radius: 18px;
-  box-shadow: 0 8px 40px rgba(27,55,92,0.20);
-  padding: 38px 32px 30px;
-  min-width: 340px; max-width: 540px;
-  display: flex; flex-direction: column; align-items: center;
+
+.modal-content {
   position: relative;
+  background-color: white;
+  border-radius: 20px;
+  width: 900px;
+  max-width: 90vw;
+  height: 550px;
+  max-height: 90vh;
+  display: flex;
+  overflow: hidden;
 }
+
 .close-btn {
-  position: absolute; top: 19px; right: 21px;
-  background: none; border: none; font-size: 1.7em; color: #424874; cursor: pointer;
-  transition: color 0.2s;
+  position: absolute;
+  top: 10px;
+  right: 15px;
+  background: none;
+  border: none;
+  font-size: 2rem;
+  font-weight: 700;
+  cursor: pointer;
+  color: #777a8c;
 }
+
 .close-btn:hover {
-  color: #39c5a5;
+  color: #3bc1a9;
 }
-.detail-poster {
-  width: 208px; height: 310px;
-  object-fit: cover; border-radius: 9px;
-  box-shadow: 0 2px 12px #aab3c5;
-  margin-bottom: 16px;
+
+.modal-left {
+  flex: 1;
+  background-color: #f0f8ff;
+  display: flex;
+  justify-content: center;
+  align-items: center;
+  padding: 10px;
+  border-radius: 20px 0 0 20px;
+  box-shadow: 10px 0 36px rgba(199, 212, 233, 0.5);
 }
-.detail-info {
-  text-align: left;
+
+.poster-large {
+  max-width: 280px;
+  max-height: 410px;
+  border-radius: 15px;
+  box-shadow: 0 15px 35px rgba(0, 0, 0, 0.3);
+  object-fit: contain;
+  background: #cfd7eb;
+}
+
+.modal-right {
+  flex: 2;
+  padding: 30px 40px;
+  display: flex;
+  flex-direction: column;
+  overflow-y: auto;
+  justify-content: flex-start;
+}
+
+.movie-info {
+  flex: 0 0 auto;
+}
+
+.movie-info h2 {
+  font-size: 2rem;
+  color: #16b89b;
+  margin-bottom: 15px;
+  font-weight: 700;
+}
+
+.score,
+.date {
+  font-size: 1.2rem;
+  color: #3bc1a9;
+  margin-bottom: 10px;
+  font-weight: 600;
+}
+
+.overview {
+  font-size: 1rem;
+  line-height: 1.6;
+  color: #555a6d;
+  white-space: pre-wrap;
+  margin-bottom: 20px;
+}
+
+.trailer-section {
+  flex: 1;
+}
+
+.trailer-section h3 {
+  font-size: 1.7rem;
+  margin-bottom: 15px;
+  color: #1e2f5a;
+  font-weight: 700;
+}
+
+.trailer-video {
   width: 100%;
+  max-width: 600px;
+  height: 350px;
+  border-radius: 20px;
+  overflow: hidden;
+  box-shadow: 0 20px 60px rgba(0, 0, 0, 0.3);
 }
-.detail-info h2 {
-  font-size: 1.23em;
-  margin-bottom: 9px;
-  font-weight: bold;
+
+.trailer-video iframe {
+  width: 100%;
+  height: 100%;
+  border: none;
 }
-.detail-rating, .detail-date {
-  font-size: 1em;
-  margin-bottom: 5px;
-  color: #39c5a5;
-}
-.detail-overview {
-  margin-top: 13px;
-  font-size: 1.03em;
-  color: #424874;
-  line-height: 1.52;
+
+/* Responsive */
+
+@media (max-width: 900px) {
+  .modal-content {
+    flex-direction: column;
+    height: auto;
+    max-height: 85vh;
+  }
+
+  .modal-left {
+    width: 100%;
+    border-radius: 20px 20px 0 0;
+    box-shadow: none;
+    max-height: 350px;
+  }
+
+  .poster-large {
+    max-width: 180px;
+    max-height: 350px;
+    margin-bottom: 20px;
+  }
+
+  .modal-right {
+    width: 100%;
+    padding: 20px 25px;
+    max-height: 350px;
+    overflow-y: auto;
+  }
+
+  .trailer-video {
+    height: 200px;
+    max-width: 100%;
+  }
 }
 </style>
